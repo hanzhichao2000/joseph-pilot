@@ -20,7 +20,8 @@ design; results are hypotheses, not claims.
 
 ## Boundary rule, one line
 
-Public = code that reproduces a published strategy with its published parameters. Private =
-anything tuned, or evaluated as a candidate for capital.
+Public = code that reproduces a published strategy with its published parameters, and its
+replication results on public data labeled as replication diagnostics. Private = anything tuned,
+or evaluated as a candidate for capital.
 
 Public contracts: https://github.com/hanzhichao2000/joseph-docs-public
