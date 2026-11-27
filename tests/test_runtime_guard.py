@@ -48,6 +48,20 @@ def write_config(tmp_path, text):
 
 def aliases_are_prefixed(source):
     tree = ast.parse(source)
+    os_names = {"os"}
+    getenv_names = set()
+    environ_names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            os_names.update(
+                alias.asname or alias.name for alias in node.names if alias.name == "os"
+            )
+        elif isinstance(node, ast.ImportFrom) and node.module == "os" and node.level == 0:
+            for alias in node.names:
+                if alias.name == "getenv":
+                    getenv_names.add(alias.asname or alias.name)
+                elif alias.name == "environ":
+                    environ_names.add(alias.asname or alias.name)
 
     def approved(value):
         if isinstance(value, ast.Constant):
@@ -59,7 +73,12 @@ def aliases_are_prefixed(source):
             isinstance(node, ast.Attribute)
             and node.attr == name
             and isinstance(node.value, ast.Name)
-            and node.value.id == "os"
+            and node.value.id in os_names
+        )
+
+    def is_environ(node):
+        return is_os_attribute(node, "environ") or (
+            isinstance(node, ast.Name) and node.id in environ_names
         )
 
     def safe_env_key(node):
@@ -75,15 +94,19 @@ def aliases_are_prefixed(source):
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.Subscript)
-            and is_os_attribute(node.value, "environ")
+            and is_environ(node.value)
             and not safe_env_key(node.slice)
         ):
             return False
         if isinstance(node, ast.Call):
-            direct_get = is_os_attribute(node.func, "getenv") or (
-                isinstance(node.func, ast.Attribute)
-                and node.func.attr == "get"
-                and is_os_attribute(node.func.value, "environ")
+            direct_get = (
+                is_os_attribute(node.func, "getenv")
+                or (isinstance(node.func, ast.Name) and node.func.id in getenv_names)
+                or (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "get"
+                    and is_environ(node.func.value)
+                )
             )
             if direct_get:
                 key = node.args[0] if node.args else None
@@ -219,6 +242,55 @@ def test_direct_env_guard_rejects_invalid_positional_combinations(method, args):
 @pytest.mark.parametrize("args", ["'CI', 'false'", "'CI', default='false'"])
 def test_direct_env_guard_allows_positional_key_with_default(method, args):
     assert aliases_are_prefixed(f"{method}({args})")
+
+
+@pytest.mark.parametrize(
+    ("import_line", "method"),
+    [
+        ("import os as o", "o.getenv"),
+        ("import os as o", "o.environ.get"),
+        ("from os import getenv", "getenv"),
+        ("from os import getenv as fetch", "fetch"),
+        ("from os import environ", "environ.get"),
+        ("from os import environ as env", "env.get"),
+    ],
+)
+@pytest.mark.parametrize(
+    "args", ["'JOSEPH_OTHER_X'", "name", "'CI', **kwargs", "key='CI', other=1"]
+)
+def test_imported_env_guard_rejects_unsafe_calls(import_line, method, args):
+    assert not aliases_are_prefixed(f"{import_line}\n{method}({args})")
+
+
+@pytest.mark.parametrize(
+    ("import_line", "environ"),
+    [
+        ("import os as o", "o.environ"),
+        ("from os import environ", "environ"),
+        ("from os import environ as env", "env"),
+    ],
+)
+@pytest.mark.parametrize("key", ["'JOSEPH_OTHER_X'", "name"])
+def test_imported_env_guard_rejects_unsafe_subscripts(import_line, environ, key):
+    assert not aliases_are_prefixed(f"{import_line}\n{environ}[{key}]")
+
+
+@pytest.mark.parametrize(
+    ("import_line", "method"),
+    [
+        ("import os as o", "o.getenv"),
+        ("import os as o", "o.environ.get"),
+        ("from os import getenv", "getenv"),
+        ("from os import getenv as fetch", "fetch"),
+        ("from os import environ", "environ.get"),
+        ("from os import environ as env", "env.get"),
+    ],
+)
+@pytest.mark.parametrize(
+    "args", ["'CI', 'false'", "key='JOSEPH_PILOT_X', default='false'", "'JOSEPH_PROGRESS'"]
+)
+def test_imported_env_guard_allows_safe_calls(import_line, method, args):
+    assert aliases_are_prefixed(f"{import_line}\n{method}({args})")
 
 
 def test_env_prefix_guard(tmp_path):
