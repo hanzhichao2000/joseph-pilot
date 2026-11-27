@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     mode: Literal["research", "diagnostic"] = Field(default="research")
     access_key: SecretStr | None = None
+    revision_root: Path | None = None
 
     @classmethod
     def settings_customise_sources(
@@ -39,6 +40,7 @@ def bootstrap(
     registry = Registry()
     registry.register(Declaration(owner="pilot", name="JOSEPH_PILOT_MODE"))
     registry.register(Declaration(owner="pilot", name="JOSEPH_PILOT_ACCESS_KEY", sensitive=True))
+    registry.register(Declaration(owner="pilot", name="JOSEPH_PILOT_REVISION_ROOT"))
     registry.register(Declaration.shared(owner="host", name="JOSEPH_PROGRESS"))
     for owner, prefix in reservations:
         registry.reserve(owner, prefix)

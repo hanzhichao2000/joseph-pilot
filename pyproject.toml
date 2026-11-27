@@ -10,7 +10,10 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic-settings==2.13.1",
-    "joseph-api @ git+https://github.com/hanzhichao2000/joseph-api.git@bce432db6836bed3ff2834946541617de285fa11",
+    "joseph-api @ git+https://github.com/hanzhichao2000/joseph-api.git@2e3dac1ecb3320acabb148289d8c892022a7b841",
+    "joseph-dal @ git+https://github.com/hanzhichao2000/joseph-dal.git@5a75ad97f792d2d5b9eb6c9be203b88078543f3f",
+    "pandas>=2.2",
+    "pyarrow>=17",
 ]
 
 [project.optional-dependencies]
@@ -33,3 +36,7 @@ files = ["src/joseph_pilot"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[[tool.mypy.overrides]]
+module = ["pandas", "pandas.*", "pyarrow", "pyarrow.*"]
+ignore_missing_imports = true

@@ -24,4 +24,18 @@ Public = code that reproduces a published strategy with its published parameters
 replication results on public data labeled as replication diagnostics. Private = anything tuned,
 or evaluated as a candidate for capital.
 
+## Contract expiry
+
+`attach_contracts` takes contract attributes from `option_contracts` and rejects missing or
+repeated symbols. `resolve_expiry` uses the source expiry date when present; otherwise it starts
+at the third Friday of `expiry_month` and advances to the first trading day. Supply an authoritative
+exchange calendar mapping every calendar date from that Friday through the resulting trading day
+to its trading status; missing dates fail closed. The helper does not fetch a calendar.
+
+The source or calendar-derived expiry is authoritative, not the last bar in a potentially truncated
+revision window. The helper compares the expiry to the symbol's last bar date and raises with both
+dates if they differ. To validate the cross-check, provide a revision whose window covers the full
+contract lifetime through expiry and whose calendar covers the holiday adjustment; an earlier last
+bar may indicate truncation or missing data, not an earlier expiry.
+
 Public contracts: https://github.com/hanzhichao2000/joseph-docs-public
