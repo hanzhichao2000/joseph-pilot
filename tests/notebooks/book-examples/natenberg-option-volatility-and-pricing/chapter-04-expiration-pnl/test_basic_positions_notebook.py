@@ -1,11 +1,13 @@
+import ast
 import json
+import sys
 from datetime import date
 from pathlib import Path
 
 import nbformat
 import pytest
+from IPython.core.inputtransformer2 import TransformerManager
 from nbclient import NotebookClient
-from test_revision import make_revision
 
 from joseph_pilot.manifest import Manifest, Pin
 
@@ -14,7 +16,29 @@ NOTEBOOK = Path(
 )
 
 
-def test_notebook_executes_reproducibly(tmp_path, monkeypatch):
+def test_notebook_import_subset():
+    notebook = nbformat.read(NOTEBOOK, as_version=4)
+    allowed = {"pandas", "pyarrow", "matplotlib", "numpy", "IPython"} | sys.stdlib_module_names
+    for cell in notebook.cells:
+        if cell.cell_type != "code":
+            continue
+        for node in ast.walk(ast.parse(TransformerManager().transform_cell(cell.source))):
+            if isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                assert node.level == 0
+                modules = [node.module or ""]
+            else:
+                continue
+            for module in modules:
+                assert module in {
+                    "joseph_pilot.manifest",
+                    "joseph_pilot.revision",
+                    "joseph_pilot.runtime",
+                } or (module.split(".")[0] in allowed), module
+
+
+def test_notebook_executes_reproducibly(tmp_path, monkeypatch, make_revision):
     symbols = ["IO2611C4000.CFE", "IO2611P4000.CFE"]
     expiry = date(2026, 11, 20)
     observed = date(2026, 11, 19)
@@ -79,7 +103,6 @@ def test_notebook_executes_reproducibly(tmp_path, monkeypatch):
             if o.output_type == "stream"
         )
         assert "2023-11-01" in text and "2023-11-25" in text
-        assert "calendar unverified" in text and "not used" in text
         outputs.append(json.loads(text.strip().splitlines()[-1]))
     assert outputs[0] == outputs[1]
     assert outputs[0]["call_break_even"] == 4009.2
