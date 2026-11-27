@@ -18,7 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff==0.17.6", "mypy==2.4.1"]
-ux = ["rich==14.3.3"]
+ux = ["rich==14.3.3", "vectorbt==0.28.1", "matplotlib>=3.8", "nbclient>=0.10", "ipykernel>=6"]
 
 [project.scripts]
 joseph-pilot = "joseph_pilot.cli:main"

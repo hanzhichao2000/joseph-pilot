@@ -1,0 +1,29 @@
+{
+  "inputs": {
+    "option_contracts": {
+      "revision_id": "option_contracts@lake:7b6cf46c1f784f159e452edc828136cc",
+      "window": null,
+      "content_digest": "290c616df591eca9f8965ba740a317ea942ba63a8c09c108ba1b8bfb09a6108f"
+    },
+    "option_bars": {
+      "revision_id": "option_bars@lake:dd97f8582206451f831c53f4cc6afce2",
+      "window": "2023-11-01..2026-11-26",
+      "content_digest": "6be92b070ec3ebb2ae1e73963977b306526b559a2ff37e69c53a84fe195f723c"
+    },
+    "index_bars": {
+      "revision_id": "index_bars@lake:f8ee741273f245019b12fb65783b01cd",
+      "window": "2023-11-26..2026-11-26",
+      "content_digest": "759e389d0b7b050c3b283b14b2a6fd7af0d908f6c46b514952b6183f0fda4bb1"
+    }
+  },
+  "economic_conventions": {
+    "premium": "2026-11-19 option settle in index points; indicative, not an execution",
+    "multiplier": "CNY per index point per contract",
+    "underlying": "nonnegative hypothetical expiry settlement index points; observed index close is context only",
+    "costs": "no fees, discounting, or early exercise"
+  },
+  "vectorbt_version": "0.28.1",
+  "seed": 42,
+  "window": "IO2611C4000.CFE and IO2611P4000.CFE; observation 2026-11-19; expiry 2026-11-20; expiry month 2026-11",
+  "experiment_id": "replication_diagnostic"
+}
