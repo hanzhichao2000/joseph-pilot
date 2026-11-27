@@ -79,7 +79,7 @@ def test_notebook_executes_reproducibly(tmp_path, monkeypatch):
             if o.output_type == "stream"
         )
         assert "2023-11-01" in text and "2023-11-25" in text
-        assert "未经日历校验" in text and "未使用" in text
+        assert "calendar unverified" in text and "not used" in text
         outputs.append(json.loads(text.strip().splitlines()[-1]))
     assert outputs[0] == outputs[1]
     assert outputs[0]["call_break_even"] == 4009.2
