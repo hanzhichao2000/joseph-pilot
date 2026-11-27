@@ -8,9 +8,14 @@ version = "0.1.0"
 description = "Minimal Joseph runtime host"
 readme = "README.md"
 requires-python = ">=3.11"
+# joseph-dal is pinned at its main until task 1.4 of option-data-interface re-pins dal to the
+# merged joseph-api commit; until then this pin and pilot's joseph-api pin cannot resolve together.
 dependencies = [
     "pydantic-settings==2.13.1",
     "joseph-api @ git+https://github.com/hanzhichao2000/joseph-api.git@bce432db6836bed3ff2834946541617de285fa11",
+    "joseph-dal @ git+https://github.com/hanzhichao2000/joseph-dal.git@823edec1932e36c18a9d4d0df599d620ca435b9f",
+    "pandas>=2.2",
+    "pyarrow>=17",
 ]
 
 [project.optional-dependencies]
@@ -33,3 +38,7 @@ files = ["src/joseph_pilot"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[[tool.mypy.overrides]]
+module = ["pandas", "pandas.*", "pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
