@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_manifest_roundtrip_and_pins(tmp_path):
     from joseph_pilot.manifest import Manifest, Pin, write_manifest
 
-    pin = Pin(revision_id="revision", window="2024", content_digest="digest")
-    other = Pin(revision_id="revision", window="2025", content_digest="digest")
+    pin = Pin(revision_id="revision", window="2024", content_digest="a" * 64)
+    other = Pin(revision_id="revision", window="2025", content_digest="a" * 64)
     assert pin != other
     manifest = Manifest(
         inputs={"data": pin},
@@ -32,7 +32,34 @@ def test_manifest_roundtrip_and_pins(tmp_path):
     with pytest.raises(ValueError):
         Manifest.model_validate({**manifest.model_dump(), "unknown": 1})
     with pytest.raises(ValueError):
-        Pin(revision_id="", window="2024", content_digest="digest")
+        Pin(revision_id="", window="2024", content_digest="a" * 64)
+
+
+def test_snapshot_windows_and_required_manifest_window():
+    from joseph_pilot.manifest import Manifest, Pin
+
+    pin = Pin(revision_id="snapshot", content_digest="a" * 64)
+    assert pin.window is None
+    values = {
+        "inputs": {"data": pin},
+        "economic_conventions": {"price": "settle"},
+        "vectorbt_version": "none",
+        "seed": 1,
+        "experiment_id": "snapshot",
+    }
+    assert Manifest(**values, window=None).window is None
+    with pytest.raises(ValueError):
+        Manifest(**values)
+
+
+@pytest.mark.parametrize(
+    "digest", ["garbage", "A" * 64, "a" * 63, "a" * 65, "g" * 64, "a" * 64 + "\n"]
+)
+def test_pin_rejects_invalid_digest(digest):
+    from joseph_pilot.manifest import Pin
+
+    with pytest.raises(ValueError):
+        Pin(revision_id="revision", window="2024", content_digest=digest)
 
 
 def run_tool(name, *args):
@@ -118,6 +145,27 @@ def test_source_fields_require_same_line_values(tmp_path, field, kind):
     (chapter / "SOURCE.md").write_text("\n".join(lines) + "\n")
     result = run_tool("check_sources.py", root)
     assert result.returncode != 0, (field, kind)
+
+
+@pytest.mark.parametrize("field", ["publication", "edition", "chapter", "published parameters"])
+@pytest.mark.parametrize(
+    "placeholder", ["TODO", "TBD", "placeholder", "unknown", "n/a", "<required>"]
+)
+def test_source_rejects_placeholder_values(tmp_path, field, placeholder):
+    chapter = tmp_path / "author-book" / "chapter-04-example"
+    chapter.mkdir(parents=True)
+    (chapter / "example.ipynb").write_text("{}")
+    fields = {
+        "publication": "A Book",
+        "edition": "2",
+        "chapter": "4",
+        "published parameters": "payoff",
+    }
+    fields[field] = placeholder
+    (chapter / "SOURCE.md").write_text(
+        "".join(f"{key}: {value}\n" for key, value in fields.items())
+    )
+    assert run_tool("check_sources.py", tmp_path).returncode != 0
 
 
 def test_source_fields_complete_values_pass(tmp_path):

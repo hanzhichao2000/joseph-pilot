@@ -28,10 +28,17 @@ def main(root: Path, strategies: Path | None = None) -> int:
             continue
         text = source.read_text(encoding="utf-8")
         for field in FIELDS:
-            if not re.search(
-                rf"(?im)^[^\S\r\n]*{re.escape(field)}[^\S\r\n]*:[^\S\r\n]*[^\s]", text
-            ):
-                errors.append(f"missing {field}: {source}")
+            match = re.search(rf"(?im)^[^\S\r\n]*{re.escape(field)}[^\S\r\n]*:([^\r\n]*)", text)
+            value = match.group(1).strip() if match else ""
+            if not value or value.casefold() in {
+                "todo",
+                "tbd",
+                "placeholder",
+                "unknown",
+                "n/a",
+                "<required>",
+            }:
+                errors.append(f"missing or placeholder {field}: {source}")
     for error in errors:
         print(error, file=sys.stderr)
     return int(bool(errors))

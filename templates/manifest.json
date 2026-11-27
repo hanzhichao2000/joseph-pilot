@@ -5,7 +5,7 @@
   "experiment_id": "example",
   "inputs": {
     "example": {
-      "content_digest": "example-digest",
+      "content_digest": "0000000000000000000000000000000000000000000000000000000000000000",
       "revision_id": "example-revision",
       "window": "example-window"
     }

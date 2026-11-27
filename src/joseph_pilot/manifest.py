@@ -11,8 +11,8 @@ class Pin(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     revision_id: NonEmpty
-    window: NonEmpty
-    content_digest: NonEmpty
+    window: NonEmpty | None = None
+    content_digest: Annotated[str, Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")]
 
 
 class Manifest(BaseModel):
@@ -22,7 +22,7 @@ class Manifest(BaseModel):
     economic_conventions: dict[str, str] = Field(min_length=1)
     vectorbt_version: NonEmpty
     seed: int
-    window: NonEmpty
+    window: NonEmpty | None
     experiment_id: NonEmpty
 
 

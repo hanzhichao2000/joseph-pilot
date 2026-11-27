@@ -54,8 +54,59 @@ def aliases_are_prefixed(source):
             return isinstance(value.value, str) and value.value.startswith("JOSEPH_PILOT_")
         return False
 
+    def is_os_attribute(node, name):
+        return (
+            isinstance(node, ast.Attribute)
+            and node.attr == name
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "os"
+        )
+
+    def safe_env_key(node):
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            return False
+        key = node.value
+        return (
+            not key.startswith("JOSEPH_")
+            or key.startswith("JOSEPH_PILOT_")
+            or key == "JOSEPH_PROGRESS"
+        )
+
     for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Subscript)
+            and is_os_attribute(node.value, "environ")
+            and not safe_env_key(node.slice)
+        ):
+            return False
         if isinstance(node, ast.Call):
+            direct_get = is_os_attribute(node.func, "getenv") or (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "get"
+                and is_os_attribute(node.func.value, "environ")
+            )
+            if direct_get:
+                key = node.args[0] if node.args else None
+                if node.args:
+                    if len(node.args) > 2 or any(isinstance(arg, ast.Starred) for arg in node.args):
+                        return False
+                    if node.keywords and (
+                        len(node.args) == 2
+                        or len(node.keywords) != 1
+                        or node.keywords[0].arg != "default"
+                    ):
+                        return False
+                else:
+                    names = [keyword.arg for keyword in node.keywords]
+                    if len(names) == len(set(names)) and set(names) in (
+                        {"key"},
+                        {"key", "default"},
+                    ):
+                        key = next(
+                            keyword.value for keyword in node.keywords if keyword.arg == "key"
+                        )
+                if key is None or not safe_env_key(key):
+                    return False
             is_field = (isinstance(node.func, ast.Name) and node.func.id == "Field") or (
                 isinstance(node.func, ast.Attribute) and node.func.attr == "Field"
             )
@@ -80,6 +131,94 @@ def aliases_are_prefixed(source):
 )
 def test_field_expanded_kwargs_fail_closed(source):
     assert not aliases_are_prefixed(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "os.getenv('JOSEPH_OTHER_X')",
+        "os.environ.get('JOSEPH_OTHER_X')",
+        "os.environ['JOSEPH_OTHER_X']",
+        "os.getenv(name)",
+        "os.environ.get(name)",
+        "os.environ[name]",
+    ],
+)
+def test_direct_env_guard_rejects_unsafe_keys(source):
+    assert not aliases_are_prefixed(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "os.getenv('JOSEPH_PILOT_X')",
+        "os.environ.get('JOSEPH_PROGRESS')",
+        "os.environ['JOSEPH_PILOT_X']",
+        "os.getenv('XDG_CONFIG_HOME')",
+        "os.environ.get('CI')",
+        "os.environ['NO_COLOR']",
+    ],
+)
+def test_direct_env_guard_allows_safe_keys(source):
+    assert aliases_are_prefixed(source)
+
+
+@pytest.mark.parametrize("method", ["os.getenv", "os.environ.get"])
+@pytest.mark.parametrize("key", ["CI", "JOSEPH_PILOT_X", "JOSEPH_PROGRESS"])
+def test_direct_env_guard_allows_safe_keyword_keys(method, key):
+    assert aliases_are_prefixed(f"{method}(key={key!r})")
+
+
+@pytest.mark.parametrize("method", ["os.getenv", "os.environ.get"])
+@pytest.mark.parametrize("key", ["'JOSEPH_OTHER_X'", "name"])
+def test_direct_env_guard_rejects_unsafe_keyword_keys(method, key):
+    assert not aliases_are_prefixed(f"{method}(key={key})")
+
+
+@pytest.mark.parametrize("method", ["os.getenv", "os.environ.get"])
+def test_direct_env_guard_rejects_expanded_keyword_keys(method):
+    assert not aliases_are_prefixed(f"{method}(**kwargs)")
+
+
+@pytest.mark.parametrize("method", ["os.getenv", "os.environ.get"])
+@pytest.mark.parametrize("key", ["CI", "JOSEPH_PILOT_X", "JOSEPH_PROGRESS"])
+def test_direct_env_guard_allows_safe_keyword_keys_with_default(method, key):
+    assert aliases_are_prefixed(f"{method}(key={key!r}, default='false')")
+
+
+@pytest.mark.parametrize("method", ["os.getenv", "os.environ.get"])
+@pytest.mark.parametrize(
+    "args",
+    [
+        "key='JOSEPH_OTHER_X', default='false'",
+        "key=name, default='false'",
+        "key='CI', default='false', other=1",
+        "key='CI', default='false', **kwargs",
+    ],
+)
+def test_direct_env_guard_rejects_unsafe_keyword_combinations(method, args):
+    assert not aliases_are_prefixed(f"{method}({args})")
+
+
+@pytest.mark.parametrize("method", ["os.getenv", "os.environ.get"])
+@pytest.mark.parametrize(
+    "args",
+    [
+        "'CI', **kwargs",
+        "'CI', other=1",
+        "'CI', 'false', default='false'",
+        "'CI', 'false', 'extra'",
+        "'CI', key='JOSEPH_OTHER_X'",
+    ],
+)
+def test_direct_env_guard_rejects_invalid_positional_combinations(method, args):
+    assert not aliases_are_prefixed(f"{method}({args})")
+
+
+@pytest.mark.parametrize("method", ["os.getenv", "os.environ.get"])
+@pytest.mark.parametrize("args", ["'CI', 'false'", "'CI', default='false'"])
+def test_direct_env_guard_allows_positional_key_with_default(method, args):
+    assert aliases_are_prefixed(f"{method}({args})")
 
 
 def test_env_prefix_guard(tmp_path):
