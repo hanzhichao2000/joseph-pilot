@@ -40,12 +40,17 @@ python3 -m venv "$wheel_dir/venv"
 
 Keep the `joseph-api` dependency pinned to an immutable full commit SHA in `pyproject.toml`.
 The current pin is `bce432db6836bed3ff2834946541617de285fa11`.
+When this repository needs new API behavior, such as the option-row DTOs from
+[joseph-api PR #10](https://github.com/hanzhichao2000/joseph-api/pull/10),
+update the pin after the API PR merges, using the full SHA of the merged commit.
 
 ## Public changes and evidence
 
 - Use `codex/<topic>-<issue number>` for work branches.
 - Keep planning issues in the internal tracker. Public PRs require approval from the private
   project lead.
+- In `joseph-docs-public` only, add new public-layer Markdown files to `public-layer.allow`
+  in the same PR and keep each file at or below 200 lines.
 - Check all public changes for vendor names, private paths and URLs, credentials, and
   proprietary strategy identifiers.
 - Attach the tested commit SHA and CI run to the governing internal GitHub issue. Follow
