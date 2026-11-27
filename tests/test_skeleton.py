@@ -257,6 +257,19 @@ def test_self_hosted_job_rejects_fork_pull_requests():
     )
 
 
+def test_ci_ruff_scans_only_pilot_directories():
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+    commands = [
+        line.strip().removeprefix("- run: ")
+        for line in workflow.splitlines()
+        if line.strip().startswith("- run: ") and ".venv/bin/ruff " in line
+    ]
+    assert commands == [
+        ".venv/bin/ruff check src tests tools",
+        ".venv/bin/ruff format --check src tests tools",
+    ]
+
+
 def test_ci_uses_isolated_python_environment():
     workflow = (ROOT / ".github/workflows/ci.yml").read_text()
     commands = [
@@ -268,8 +281,8 @@ def test_ci_uses_isolated_python_environment():
         'python3 -c "import sys; assert sys.version_info >= (3, 11), sys.version"',
         "python3 -m venv .venv",
         ".venv/bin/pip install '.[dev,ux]'",
-        ".venv/bin/ruff check .",
-        ".venv/bin/ruff format --check .",
+        ".venv/bin/ruff check src tests tools",
+        ".venv/bin/ruff format --check src tests tools",
         ".venv/bin/mypy",
         ".venv/bin/pytest",
         ".venv/bin/python tools/check_sources.py",

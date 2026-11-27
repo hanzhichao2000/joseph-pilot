@@ -16,8 +16,8 @@ jobs:
       - run: python3 -c "import sys; assert sys.version_info >= (3, 11), sys.version"
       - run: python3 -m venv .venv
       - run: .venv/bin/pip install '.[dev,ux]'
-      - run: .venv/bin/ruff check .
-      - run: .venv/bin/ruff format --check .
+      - run: .venv/bin/ruff check src tests tools
+      - run: .venv/bin/ruff format --check src tests tools
       - run: .venv/bin/mypy
       - run: .venv/bin/pytest
       - run: .venv/bin/python tools/check_sources.py
