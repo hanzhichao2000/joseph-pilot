@@ -550,6 +550,75 @@ def test_dependency_constraints_match_validated_versions():
     assert "rich==14.3.3" in project["optional-dependencies"]["ux"]
 
 
+def test_relative_xdg_uses_home_fallback_from_both_working_directories(tmp_path):
+    home = tmp_path / "home"
+    config = home / ".config" / "joseph"
+    config.mkdir(parents=True)
+    path = config / ".env"
+    path.write_text("JOSEPH_PILOT_MODE=diagnostic\n")
+    path.chmod(0o600)
+    for name in ("first", "second"):
+        cwd = tmp_path / name
+        cwd.mkdir()
+        decoy = cwd / "relative" / "joseph"
+        decoy.mkdir(parents=True)
+        decoy_file = decoy / ".env"
+        decoy_file.write_text("JOSEPH_PILOT_MODE=research\n")
+        decoy_file.chmod(0o600)
+        result = subprocess.run(
+            [str(Path(sys.executable).with_name("joseph-pilot")), "runtime-check", "--json"],
+            cwd=cwd,
+            env=env_for(home, XDG_CONFIG_HOME="relative"),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0
+        assert json.loads(result.stdout)["config"]["JOSEPH_PILOT_MODE"] == "diagnostic"
+
+
+def test_active_access_key_in_unsafe_file_is_rejected_without_chmod_or_leak(tmp_path):
+    path = write_config(tmp_path, f"JOSEPH_PILOT_ACCESS_KEY={CANARY}\n")
+    path.chmod(0o644)
+    result = run_cli(tmp_path, "runtime-check", "--json")
+    if CANARY in result.stdout + result.stderr:
+        pytest.fail("Sensitive value leaked", pytrace=False)
+    assert result.returncode != 0
+    assert not result.stdout
+    assert "Unsafe shared file" in result.stderr
+    assert path.stat().st_mode & 0o777 == 0o644
+
+
+def test_cli_exception_cleans_progress_before_safe_diagnostic(tmp_path):
+    code = """import contextlib, sys
+from joseph_pilot import cli
+real_progress = cli.progress
+@contextlib.contextmanager
+def tracked(enabled):
+    try:
+        with real_progress(enabled):
+            print('entered', file=sys.stderr)
+            yield
+            raise RuntimeError('synthetic-access-value-7319-long-canary')
+    finally:
+        print('cleanup', file=sys.stderr)
+cli.progress = tracked
+raise SystemExit(cli.main(['runtime-check', '--json']))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env_for(tmp_path),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if CANARY in result.stdout + result.stderr:
+        pytest.fail("Sensitive value leaked", pytrace=False)
+    assert result.returncode != 0
+    assert not result.stdout
+    assert result.stderr.splitlines() == ["entered", "cleanup", "runtime check failed"]
+
+
 def test_non_tty_has_no_progress(tmp_path):
     result = run_cli(tmp_path, "runtime-check", "--json", TERM="xterm-256color")
     assert result.returncode == 0
