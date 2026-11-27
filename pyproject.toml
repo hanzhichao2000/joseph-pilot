@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "joseph-pilot"
+version = "0.1.0"
+description = "Minimal Joseph runtime host"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic-settings==2.13.1",
+    "joseph-api @ git+https://github.com/hanzhichao2000/joseph-api.git@bce432db6836bed3ff2834946541617de285fa11",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff==0.17.6", "mypy==2.4.1"]
+ux = ["rich==14.3.3"]
+
+[project.scripts]
+joseph-pilot = "joseph_pilot.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+strict = true
+files = ["src/joseph_pilot"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

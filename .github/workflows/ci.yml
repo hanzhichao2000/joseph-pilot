@@ -1,0 +1,24 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: hanzhichao2000/joseph-docs-public
+          path: .boundary-docs
+      - run: python3 -c "import sys; assert sys.version_info >= (3, 11), sys.version"
+      - run: python3 -m venv .venv
+      - run: .venv/bin/pip install '.[dev,ux]'
+      - run: .venv/bin/ruff check src tests tools
+      - run: .venv/bin/ruff format --check src tests tools
+      - run: .venv/bin/mypy
+      - run: .venv/bin/pytest
+      - run: .venv/bin/python tools/check_sources.py
+      - run: .venv/bin/python tools/check_keywords.py .boundary-docs/keywords .
