@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from pathlib import Path
 from typing import Annotated
 
@@ -7,11 +8,19 @@ from pydantic import BaseModel, ConfigDict, Field
 NonEmpty = Annotated[str, Field(min_length=1)]
 
 
+class CalendarRange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    start: date
+    end: date
+
+
 class Pin(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     revision_id: NonEmpty
     window: NonEmpty | None = None
+    calendar_unverified: CalendarRange | None = None
     content_digest: Annotated[str, Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")]
 
 
