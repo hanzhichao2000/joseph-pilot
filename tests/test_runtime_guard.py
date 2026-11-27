@@ -65,7 +65,9 @@ def aliases_are_prefixed(source):
 
     def approved(value):
         if isinstance(value, ast.Constant):
-            return isinstance(value.value, str) and value.value.startswith("JOSEPH_PILOT_")
+            return isinstance(value.value, str) and (
+                value.value == "$schema" or value.value.startswith("JOSEPH_PILOT_")
+            )
         return False
 
     def is_os_attribute(node, name):
@@ -300,6 +302,7 @@ def test_env_prefix_guard(tmp_path):
     assert not aliases_are_prefixed("BARE = 'UNAPPROVED'; x = Field(validation_alias=BARE)")
     assert not aliases_are_prefixed("x = Field(alias=make_alias('JOSEPH_PILOT_OK'))")
     assert aliases_are_prefixed('x = Field(alias="JOSEPH_PILOT_SAFE")')
+    assert aliases_are_prefixed('x = Field(alias="$schema")')
     assert not aliases_are_prefixed('x = Field(validation_alias=AliasChoices("JOSEPH_PILOT_SAFE"))')
     write_config(tmp_path, "JOSEPH_MINI_OTHER=ignored\nJOSEPH_PILOT_UNKNOWN=value\n")
     result = run_cli(tmp_path, "runtime-check", "--json")

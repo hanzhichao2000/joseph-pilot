@@ -121,7 +121,11 @@ def test_keyword_guard_rejects_invalid_scan_root(tmp_path, kind):
 def test_template_valid():
     from joseph_pilot.manifest import Manifest
 
-    Manifest.model_validate_json((ROOT / "templates" / "manifest.json").read_text())
+    template = json.loads((ROOT / "templates" / "manifest.json").read_text())
+    assert template["$schema"] == "1"
+    assert Manifest.model_validate(template).model_dump(by_alias=True)["$schema"] == "1"
+    with pytest.raises(ValueError):
+        Manifest.model_validate({**template, "$schema": "2"})
 
 
 @pytest.mark.parametrize("field", ["publication", "edition", "chapter", "published parameters"])
