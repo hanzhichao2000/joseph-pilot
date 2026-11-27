@@ -1,0 +1,16 @@
+{
+  "economic_conventions": {
+    "price": "settlement"
+  },
+  "experiment_id": "example",
+  "inputs": {
+    "example": {
+      "content_digest": "example-digest",
+      "revision_id": "example-revision",
+      "window": "example-window"
+    }
+  },
+  "seed": 0,
+  "vectorbt_version": "none",
+  "window": "example-window"
+}
