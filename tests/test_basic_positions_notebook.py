@@ -45,6 +45,12 @@ def test_notebook_executes_reproducibly(tmp_path, monkeypatch):
         pins[capability] = Pin(
             revision_id=record.revision_id, window=None, content_digest=record.content_digest
         )
+    pins["option_bars"] = Pin.model_validate(
+        {
+            **pins["option_bars"].model_dump(),
+            "calendar_unverified": {"start": "2023-11-01", "end": "2023-11-25"},
+        }
+    )
     manifest = Manifest(
         inputs=pins,
         economic_conventions={"premium": "settle"},
@@ -55,7 +61,12 @@ def test_notebook_executes_reproducibly(tmp_path, monkeypatch):
     )
     path = tmp_path / "manifest.json"
     path.write_text(manifest.model_dump_json())
-    monkeypatch.setenv("JOSEPH_PILOT_REVISION_ROOT", str(tmp_path))
+    monkeypatch.delenv("JOSEPH_PILOT_REVISION_ROOT", raising=False)
+    config = tmp_path / "config" / "joseph" / ".env"
+    config.parent.mkdir(parents=True)
+    config.write_text(f"JOSEPH_PILOT_REVISION_ROOT={tmp_path}\n")
+    config.chmod(0o600)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("PILOT_MANIFEST_PATH", str(path))
     outputs = []
     for _ in range(2):
@@ -67,6 +78,8 @@ def test_notebook_executes_reproducibly(tmp_path, monkeypatch):
             for o in c.get("outputs", [])
             if o.output_type == "stream"
         )
+        assert "2023-11-01" in text and "2023-11-25" in text
+        assert "未经日历校验" in text and "未使用" in text
         outputs.append(json.loads(text.strip().splitlines()[-1]))
     assert outputs[0] == outputs[1]
     assert outputs[0]["call_break_even"] == 4009.2

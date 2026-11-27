@@ -8,6 +8,7 @@
     "option_bars": {
       "revision_id": "option_bars@lake:dd97f8582206451f831c53f4cc6afce2",
       "window": "2023-11-01..2026-11-26",
+      "calendar_unverified": {"start": "2023-11-01", "end": "2023-11-25"},
       "content_digest": "6be92b070ec3ebb2ae1e73963977b306526b559a2ff37e69c53a84fe195f723c"
     },
     "index_bars": {
