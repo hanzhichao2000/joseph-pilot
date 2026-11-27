@@ -43,7 +43,10 @@ def load_revision(capability: str, *, settings: Settings | None = None) -> Revis
     receipt = root / f"{capability}.revision.json"
     record = RevisionRecord.from_json(receipt.read_text(encoding="utf-8"))
     verify_revision(root, record)
-    frames = [pq.read_table(root / entry.path).to_pandas() for entry in record.files]
+    parquet_files = [entry for entry in record.files if entry.path.endswith(".parquet")]
+    if not parquet_files:
+        raise ValueError(f"revision {record.revision_id!r} contains no Parquet data files")
+    frames = [pq.read_table(root / entry.path).to_pandas() for entry in parquet_files]
     rows = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
     window = f"{record.window.start}..{record.window.end}" if record.window else None
     pin = Pin(

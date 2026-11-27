@@ -93,6 +93,46 @@ def test_load_revision_returns_rows_and_pin(tmp_path: Path) -> None:
     )
 
 
+def add_coverage_file(root: Path, record: RevisionRecord) -> RevisionRecord:
+    path = root / f"{record.capability_id}.coverage.json"
+    path.write_text(
+        '{"calendar_unverified": {"start": "2024-01-02", "end": "2024-01-02"}}',
+        encoding="utf-8",
+    )
+    files = (
+        *record.files,
+        RevisionFile(
+            path=path.relative_to(root).as_posix(),
+            digest=hashlib.sha256(path.read_bytes()).hexdigest(),
+            size=path.stat().st_size,
+        ),
+    )
+    updated = record.model_copy(
+        update={
+            "files": files,
+            "content_digest": RevisionRecord.compute_content_digest(
+                record.capability_id, record.schema_version, record.source, files
+            ),
+        }
+    )
+    (root / f"{record.capability_id}.revision.json").write_text(updated.to_json(), encoding="utf-8")
+    return updated
+
+
+def test_load_revision_skips_coverage_json(tmp_path: Path) -> None:
+    record = add_coverage_file(tmp_path, make_revision(tmp_path, "option_bars", BARS))
+    data = load_revision("option_bars", settings=settings_for(tmp_path))
+    assert data.record == record
+    assert data.rows.to_dict("records") == BARS["year=2024/month=1/data_0.parquet"]
+    assert "calendar_unverified" not in data.rows.columns
+
+
+def test_load_revision_rejects_receipt_without_parquet(tmp_path: Path) -> None:
+    add_coverage_file(tmp_path, make_revision(tmp_path, "option_bars", {}))
+    with pytest.raises(ValueError, match="contains no Parquet data files"):
+        load_revision("option_bars", settings=settings_for(tmp_path))
+
+
 def test_missing_file_fails_by_name_before_any_read(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
