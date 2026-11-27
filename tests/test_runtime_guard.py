@@ -577,6 +577,50 @@ def test_relative_xdg_uses_home_fallback_from_both_working_directories(tmp_path)
         assert json.loads(result.stdout)["config"]["JOSEPH_PILOT_MODE"] == "diagnostic"
 
 
+def test_empty_xdg_uses_home_fallback_via_console(tmp_path):
+    home = tmp_path / "home"
+    path = home / ".config" / "joseph" / ".env"
+    path.parent.mkdir(parents=True)
+    path.write_text(f"JOSEPH_PILOT_MODE=diagnostic\nJOSEPH_PILOT_ACCESS_KEY={CANARY}\n")
+    path.chmod(0o600)
+    result = subprocess.run(
+        [str(Path(sys.executable).with_name("joseph-pilot")), "runtime-check", "--json"],
+        cwd=tmp_path,
+        env=env_for(home, XDG_CONFIG_HOME=""),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if CANARY in result.stdout + result.stderr:
+        pytest.fail("Sensitive value leaked", pytrace=False)
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["config"] == {
+        "JOSEPH_PILOT_MODE": "diagnostic",
+        "JOSEPH_PILOT_ACCESS_KEY": "***",
+    }
+
+
+def test_cli_fails_safely_when_platform_secure_access_is_unavailable(tmp_path):
+    write_config(tmp_path, f"JOSEPH_PILOT_ACCESS_KEY={CANARY}\n")
+    code = """import joseph_api.env
+from joseph_pilot import cli
+joseph_api.env._supports_secure_file_reading = lambda: False
+raise SystemExit(cli.main(['runtime-check', '--json']))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env_for(tmp_path, JOSEPH_PILOT_ACCESS_KEY=CANARY),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if CANARY in result.stdout + result.stderr:
+        pytest.fail("Sensitive value leaked", pytrace=False)
+    assert result.returncode != 0
+    assert not result.stdout
+    assert "Secure shared file access unavailable" in result.stderr
+
+
 def test_active_access_key_in_unsafe_file_is_rejected_without_chmod_or_leak(tmp_path):
     path = write_config(tmp_path, f"JOSEPH_PILOT_ACCESS_KEY={CANARY}\n")
     path.chmod(0o644)
