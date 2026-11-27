@@ -1,5 +1,4 @@
 {
-  "$schema": "1",
   "economic_conventions": {
     "price": "settlement"
   },
