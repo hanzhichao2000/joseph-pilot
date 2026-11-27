@@ -68,6 +68,8 @@ CONTRACTS = {
             "symbol": "IO2403C3500.CFE",
             "expiry_date": None,
             "expiry_month": date(2024, 3, 1),
+            "option_type": "call",
+            "strike": 3500.0,
             "multiplier": 100.0,
         }
     ]
@@ -138,7 +140,16 @@ def test_attach_contracts_joins_on_symbol() -> None:
     joined = attach_contracts(bars, contracts)
     assert joined["expiry_month"].iloc[0] == date(2024, 3, 1)
     assert joined["multiplier"].iloc[0] == 100.0
+    assert joined["option_type"].tolist() == ["call", "call"]
+    assert joined["strike"].tolist() == [3500.0, 3500.0]
     assert len(joined) == 2
+
+
+def test_attach_contracts_rejects_duplicate_symbols() -> None:
+    bars = pd.DataFrame({"symbol": ["IO2403C3500.CFE"]})
+    contracts = pd.DataFrame(CONTRACTS["part-0.parquet"] * 2)
+    with pytest.raises(ValueError):
+        attach_contracts(bars, contracts)
 
 
 def test_attach_contracts_reports_bars_without_a_contract() -> None:
@@ -161,10 +172,33 @@ def test_resolve_expiry_uses_the_source_date_or_the_third_friday() -> None:
     assert resolve_expiry(date(2026, 11, 20), date(2026, 11, 1), date(2026, 11, 20)) == date(
         2026, 11, 20
     )
-    assert resolve_expiry(None, date(2024, 3, 1), date(2024, 3, 15)) == date(2024, 3, 15)
-    assert resolve_expiry(None, date(2024, 11, 1), date(2024, 11, 15)) == date(2024, 11, 15)
+    assert resolve_expiry(
+        None, date(2024, 3, 1), date(2024, 3, 15), trading_calendar={date(2024, 3, 15): True}
+    ) == date(2024, 3, 15)
+    assert resolve_expiry(
+        None, date(2024, 11, 1), date(2024, 11, 15), trading_calendar={date(2024, 11, 15): True}
+    ) == date(2024, 11, 15)
+
+
+def test_resolve_expiry_rolls_holiday_forward_using_calendar() -> None:
+    calendar = {
+        date(2024, 3, 15): False,
+        date(2024, 3, 16): False,
+        date(2024, 3, 17): False,
+        date(2024, 3, 18): True,
+    }
+    assert resolve_expiry(
+        None, date(2024, 3, 1), date(2024, 3, 18), trading_calendar=calendar
+    ) == date(2024, 3, 18)
+
+
+def test_resolve_expiry_requires_complete_calendar() -> None:
+    with pytest.raises(ValueError, match="calendar"):
+        resolve_expiry(None, date(2024, 3, 1), date(2024, 3, 15), trading_calendar={})
 
 
 def test_resolve_expiry_raises_on_disagreement() -> None:
     with pytest.raises(ValueError, match=r"2024-03-15.*2024-03-14"):
-        resolve_expiry(None, date(2024, 3, 1), date(2024, 3, 14))
+        resolve_expiry(
+            None, date(2024, 3, 1), date(2024, 3, 14), trading_calendar={date(2024, 3, 15): True}
+        )

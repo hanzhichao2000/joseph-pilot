@@ -3,6 +3,7 @@ read, read as plain Parquet into rows plus the pin. Never a live source, never t
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -14,7 +15,7 @@ from joseph_dal import verify_revision
 from joseph_pilot.manifest import Pin
 from joseph_pilot.runtime import Settings, bootstrap
 
-CONTRACT_COLUMNS = ("expiry_date", "expiry_month", "multiplier")
+CONTRACT_COLUMNS = ("expiry_date", "expiry_month", "option_type", "strike", "multiplier")
 
 
 @dataclass(frozen=True)
@@ -56,20 +57,38 @@ def load_revision(capability: str, *, settings: Settings | None = None) -> Revis
 def attach_contracts(bars: pd.DataFrame, contracts: pd.DataFrame) -> pd.DataFrame:
     """Join option bars to their contract rows on `symbol` for the typed contract columns.
 
-    Bars already carry strike and right; the contract row adds the expiry month, the expiry date
-    when the source still dates the contract, and the multiplier. A bar whose symbol has no
-    contract row is reported, not dropped.
+    Contract columns are sourced from the contract row. Missing or duplicate contract symbols
+    are rejected rather than dropping or multiplying bars.
     """
     orphans = sorted(set(bars["symbol"]) - set(contracts["symbol"]))
     if orphans:
         raise ValueError(f"{len(orphans)} bar symbols have no contract row, e.g. {orphans[:3]}")
-    return bars.merge(contracts[["symbol", *CONTRACT_COLUMNS]], on="symbol", how="left")
+    return bars.drop(columns=list(CONTRACT_COLUMNS), errors="ignore").merge(
+        contracts[["symbol", *CONTRACT_COLUMNS]], on="symbol", how="left", validate="many_to_one"
+    )
 
 
-def resolve_expiry(expiry_date: date | None, expiry_month: date, last_bar_date: date) -> date:
-    """The contract's expiry: the source's date when it has one, else the third Friday of the
-    source's expiry month; the derived date must agree with the symbol's last bar date."""
-    resolved = expiry_date or third_friday(expiry_month.year, expiry_month.month)
+def resolve_expiry(
+    expiry_date: date | None,
+    expiry_month: date,
+    last_bar_date: date,
+    *,
+    trading_calendar: Mapping[date, bool] | None = None,
+) -> date:
+    """Use the source expiry, or roll the third Friday to the next calendar trading day.
+
+    A derived expiry requires a calendar covering every day through the next trading day.
+    The expiry, never the potentially truncated last bar, is authoritative; a mismatch fails.
+    """
+    resolved = expiry_date
+    if resolved is None:
+        resolved = third_friday(expiry_month.year, expiry_month.month)
+        while True:
+            if trading_calendar is None or resolved not in trading_calendar:
+                raise ValueError(f"trading calendar missing date {resolved}")
+            if trading_calendar[resolved]:
+                break
+            resolved += timedelta(days=1)
     if resolved != last_bar_date:
         raise ValueError(
             f"derived expiry {resolved} disagrees with the symbol's last bar date {last_bar_date}"
