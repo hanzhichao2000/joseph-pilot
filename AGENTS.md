@@ -26,6 +26,10 @@ for publishable boundary rules. The repository-local checker and list mirror the
 checker and run without a separate documentation checkout. CI reports counts for findings.
 Keep internal roadmap and tracker details out of public documentation and examples.
 
+Run the checker from a clean checkout to reproduce CI. It reads paths from the
+Git index and content from the working tree. A run with local changes cannot
+verify the staged snapshot.
+
 For packaging verification, build the repository wheel and install it with its dependencies
 into a separate, clean venv. Run the installed CLI from outside the checkout.
 
