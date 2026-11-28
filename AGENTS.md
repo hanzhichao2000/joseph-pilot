@@ -21,8 +21,10 @@ pytest
 python tools/check_sources.py
 ```
 
-Use the public boundary keyword lists with the existing scanner. CI checks out the lists
-under `.boundary-docs` and runs `python tools/check_keywords.py .boundary-docs/keywords .`.
+Run `python3 tools/check_keywords.py keywords/public-boundary.txt .` to reproduce the CI check
+for publishable boundary rules. The repository-local checker and list mirror the public docs
+checker and run without a separate documentation checkout. CI reports counts for findings.
+Keep internal roadmap and tracker details out of public documentation and examples.
 
 For packaging verification, build the repository wheel and install it with its dependencies
 into a separate, clean venv. Run the installed CLI from outside the checkout.

@@ -1,0 +1,4 @@
+# Publishable indicators of machine-local home directories. One literal per line.
+/home/
+/Users/
+\Users\

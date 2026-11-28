@@ -88,33 +88,45 @@ def test_source_guard(tmp_path):
     assert run_tool("check_sources.py", root).returncode != 0
 
 
-def test_keyword_guard(tmp_path):
-    keywords = tmp_path / "keywords"
-    keywords.mkdir()
-    for name in ("private-paths.txt", "proprietary-strategies.txt", "vendor.txt"):
-        (keywords / name).write_text("synthetic-forbidden-term\n")
+@pytest.fixture
+def keyword_repo(tmp_path):
     root = tmp_path / "repo"
-    (root / "src").mkdir(parents=True)
-    (root / "src" / "file.py").write_text("SYNTHETIC-FORBIDDEN-TERM")
-    assert run_tool("check_keywords.py", keywords, root).returncode != 0
-    (root / "src" / "file.py").write_text("safe")
-    assert run_tool("check_keywords.py", keywords, root).returncode == 0
-    assert run_tool("check_keywords.py", tmp_path / "missing", root).returncode != 0
+    root.mkdir()
+    subprocess.run(["git", "-C", root, "init", "-q"], check=True)
+    return root
+
+
+@pytest.fixture
+def keywords(tmp_path):
+    path = tmp_path / "keywords.txt"
+    path.write_text("synthetic-forbidden-term\n")
+    return path
+
+
+def track_keyword_fixture(root, filename, content):
+    path = root / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+    subprocess.run(["git", "-C", root, "add", "--", filename], check=True)
+    return path
+
+
+def test_keyword_guard(keyword_repo, keywords):
+    path = track_keyword_fixture(keyword_repo, "src/file.py", "SYNTHETIC-FORBIDDEN-TERM")
+    assert run_tool("check_keywords.py", keywords, keyword_repo).returncode == 1
+    path.write_text("safe")
+    assert run_tool("check_keywords.py", keywords, keyword_repo).returncode == 0
 
 
 @pytest.mark.parametrize("kind", ["missing", "file"])
-def test_keyword_guard_rejects_invalid_scan_root(tmp_path, kind):
-    keywords = tmp_path / "keywords"
-    keywords.mkdir()
-    for name in ("private-paths.txt", "proprietary-strategies.txt", "vendor.txt"):
-        (keywords / name).write_text("synthetic-secret-term\n")
+def test_keyword_guard_rejects_invalid_scan_root(tmp_path, keywords, kind):
     root = tmp_path / "scan-root"
     if kind == "file":
         root.write_text("safe")
     result = run_tool("check_keywords.py", keywords, root)
-    assert result.returncode != 0
-    assert "root" in result.stderr.lower()
-    assert "synthetic-secret-term" not in result.stdout + result.stderr
+    assert result.returncode == 2
+    assert "target Git working tree" in result.stderr
+    assert "synthetic-forbidden-term" not in result.stdout + result.stderr
     assert "Traceback" not in result.stderr
 
 
@@ -216,37 +228,33 @@ def test_real_source_roots_pass():
     )
 
 
-@pytest.mark.parametrize("name", ["private-paths.txt", "proprietary-strategies.txt", "vendor.txt"])
-@pytest.mark.parametrize("invalid", ["missing", "empty", "comments"])
-def test_keyword_lists_required_and_nonempty(tmp_path, name, invalid):
-    keywords = tmp_path / "keywords"
-    keywords.mkdir()
-    for filename in ("private-paths.txt", "proprietary-strategies.txt", "vendor.txt"):
-        (keywords / filename).write_text("synthetic-term\n")
-    target = keywords / name
-    if invalid == "missing":
-        target.unlink()
+@pytest.mark.parametrize("invalid", [None, "", "# comment\n  \n"])
+def test_keyword_list_required_and_nonempty(keyword_repo, keywords, invalid):
+    if invalid is None:
+        keywords.unlink()
     else:
-        target.write_text("# comment\n  \n" if invalid == "comments" else "")
-    root = tmp_path / "repo"
-    root.mkdir()
-    assert run_tool("check_keywords.py", keywords, root).returncode != 0
+        keywords.write_text(invalid)
+    assert run_tool("check_keywords.py", keywords, keyword_repo).returncode == 2
 
 
 @pytest.mark.parametrize(
     "filename",
     ["tools/example.py", ".github/workflows/ci.yml", "pyproject.toml", "README.md", "LICENSE"],
 )
-def test_keyword_scans_public_text(tmp_path, filename):
-    keywords = tmp_path / "keywords"
-    keywords.mkdir()
-    for name in ("private-paths.txt", "proprietary-strategies.txt", "vendor.txt"):
-        (keywords / name).write_text("synthetic-term\n")
-    root = tmp_path / "repo"
-    path = root / filename
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("SYNTHETIC-TERM")
-    assert run_tool("check_keywords.py", keywords, root).returncode != 0
+def test_keyword_scans_public_text(keyword_repo, keywords, filename):
+    track_keyword_fixture(keyword_repo, filename, "SYNTHETIC-FORBIDDEN-TERM")
+    result = run_tool("check_keywords.py", keywords, keyword_repo)
+    assert result.returncode == 1
+    assert "(0 path, 1 text matches)" in result.stderr
+    assert "synthetic-forbidden-term" not in result.stderr.casefold()
+
+
+def test_keyword_scans_tracked_paths(keyword_repo, keywords):
+    track_keyword_fixture(keyword_repo, "src/synthetic-forbidden-term/module.py", "pass")
+    result = run_tool("check_keywords.py", keywords, keyword_repo)
+    assert result.returncode == 1
+    assert "(1 path, 0 text matches)" in result.stderr
+    assert "synthetic-forbidden-term" not in result.stderr
 
 
 def test_self_hosted_job_rejects_fork_pull_requests():
@@ -278,6 +286,7 @@ def test_ci_uses_isolated_python_environment():
         if line.strip().startswith("- run: ")
     ]
     assert commands == [
+        "python3 tools/check_keywords.py keywords/public-boundary.txt .",
         'python3 -c "import sys; assert sys.version_info >= (3, 11), sys.version"',
         "python3 -m venv .venv",
         ".venv/bin/pip install '.[dev,ux]'",
@@ -286,5 +295,4 @@ def test_ci_uses_isolated_python_environment():
         ".venv/bin/mypy",
         ".venv/bin/pytest",
         ".venv/bin/python tools/check_sources.py",
-        ".venv/bin/python tools/check_keywords.py .boundary-docs/keywords .",
     ]
