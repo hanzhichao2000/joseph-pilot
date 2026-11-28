@@ -16,8 +16,12 @@ NOTEBOOK = Path(
 )
 
 
-def test_notebook_import_subset():
-    notebook = nbformat.read(NOTEBOOK, as_version=4)
+@pytest.mark.parametrize(
+    "path",
+    [NOTEBOOK, NOTEBOOK.with_name("parity-io-2024-2025.ipynb")],
+)
+def test_notebook_import_subset(path):
+    notebook = nbformat.read(path, as_version=4)
     allowed = {"pandas", "pyarrow", "matplotlib", "numpy", "IPython"} | sys.stdlib_module_names
     for cell in notebook.cells:
         if cell.cell_type != "code":
