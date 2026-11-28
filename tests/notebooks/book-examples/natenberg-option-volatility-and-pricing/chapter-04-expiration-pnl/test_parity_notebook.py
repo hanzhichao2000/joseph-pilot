@@ -72,8 +72,9 @@ def test_parity_notebook_executes_on_revisions(tmp_path, monkeypatch, make_revis
         inputs=pins,
         economic_conventions={
             "entry": "settle twenty trading days before expiry",
-            "expiry": "expiry-day settle",
-            "underlying": "IF futures settle on expiry day",
+            "expiry": "expiry-day option settle",
+            "underlying": "matching IF futures settle on expiry day",
+            "costs": "no fees or margin",
         },
         vectorbt_version="none",
         seed=42,
@@ -84,6 +85,14 @@ def test_parity_notebook_executes_on_revisions(tmp_path, monkeypatch, make_revis
     path.write_text(manifest.model_dump_json())
     monkeypatch.setenv("JOSEPH_PILOT_REVISION_ROOT", str(tmp_path))
     monkeypatch.setenv("PILOT_MANIFEST_PATH", str(path))
+    manifest.economic_conventions["costs"] = "fees included"
+    path.write_text(manifest.model_dump_json())
+    with pytest.raises(CellExecutionError, match="economic conventions"):
+        NotebookClient(
+            nbformat.read(NOTEBOOK, as_version=4), timeout=180, kernel_name="python3"
+        ).execute()
+    manifest.economic_conventions["costs"] = "no fees or margin"
+    path.write_text(manifest.model_dump_json())
     notebook = nbformat.read(NOTEBOOK, as_version=4)
     NotebookClient(notebook, timeout=180, kernel_name="python3").execute()
     text = "".join(
