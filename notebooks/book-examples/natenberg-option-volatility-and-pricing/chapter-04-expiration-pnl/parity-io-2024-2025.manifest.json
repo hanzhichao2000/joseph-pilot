@@ -1,0 +1,41 @@
+{
+  "economic_conventions": {
+    "costs": "no fees or margin",
+    "entry": "settle twenty trading days before expiry",
+    "expiry": "expiry-day option settle",
+    "underlying": "matching IF futures settle on expiry day"
+  },
+  "experiment_id": "replication_diagnostic",
+  "inputs": {
+    "futures_bars": {
+      "calendar_unverified": null,
+      "content_digest": "bb2bab2072ab0093261db0889bbccdaa711128e9d103d7bb6f002322d90ea785",
+      "revision_id": "futures_bars@lake:10816467902c4f1b90de130681f03b31",
+      "window": "2023-11-01..2026-11-26"
+    },
+    "index_bars": {
+      "calendar_unverified": null,
+      "content_digest": "759e389d0b7b050c3b283b14b2a6fd7af0d908f6c46b514952b6183f0fda4bb1",
+      "revision_id": "index_bars@lake:f8ee741273f245019b12fb65783b01cd",
+      "window": "2023-11-01..2026-11-26"
+    },
+    "option_bars": {
+      "calendar_unverified": {
+        "end": "2023-11-25",
+        "start": "2023-11-01"
+      },
+      "content_digest": "6be92b070ec3ebb2ae1e73963977b306526b559a2ff37e69c53a84fe195f723c",
+      "revision_id": "option_bars@lake:dd97f8582206451f831c53f4cc6afce2",
+      "window": "2023-11-01..2026-11-26"
+    },
+    "option_contracts": {
+      "calendar_unverified": null,
+      "content_digest": "290c616df591eca9f8965ba740a317ea942ba63a8c09c108ba1b8bfb09a6108f",
+      "revision_id": "option_contracts@lake:7b6cf46c1f784f159e452edc828136cc",
+      "window": null
+    }
+  },
+  "seed": 42,
+  "vectorbt_version": "none",
+  "window": "2024..2025"
+}
