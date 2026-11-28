@@ -9,11 +9,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: hanzhichao2000/joseph-docs-public
-          ref: b8bb863e73e229dbaa1f937453ab1687dcbc758c
-          path: .boundary-docs
+      - run: python3 tools/check_keywords.py keywords/public-boundary.txt .
       - run: python3 -c "import sys; assert sys.version_info >= (3, 11), sys.version"
       - run: python3 -m venv .venv
       - run: .venv/bin/pip install '.[dev,ux]'
@@ -22,4 +18,3 @@ jobs:
       - run: .venv/bin/mypy
       - run: .venv/bin/pytest
       - run: .venv/bin/python tools/check_sources.py
-      - run: .venv/bin/python tools/check_keywords.py .boundary-docs/keywords .

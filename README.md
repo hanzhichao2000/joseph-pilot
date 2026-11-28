@@ -47,3 +47,10 @@ contract lifetime through expiry and whose calendar covers the holiday adjustmen
 bar may indicate truncation or missing data, not an earlier expiry.
 
 Public contracts: https://github.com/hanzhichao2000/joseph-docs-public
+
+## Reproduce the public boundary check
+
+Run `python3 tools/check_keywords.py keywords/public-boundary.txt .`.
+Run the checker from a clean checkout to reproduce CI. It reads paths from the
+Git index and content from the working tree. A run with local changes cannot
+verify the staged snapshot.
