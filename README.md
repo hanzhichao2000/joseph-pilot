@@ -24,6 +24,14 @@ Public = code that reproduces a published strategy with its published parameters
 replication results on public data labeled as replication diagnostics. Private = anything tuned,
 or evaluated as a candidate for capital.
 
+## Notebooks
+
+Book examples belong under `notebooks/book-examples/<author-book>/chapter-<number>-<topic>/`.
+Each notebook must have a `SOURCE.md` in its chapter directory identifying publication, edition,
+chapter, and published parameters, with any example assumptions distinguished from the source.
+Label results as replication diagnostics, not evidence of strategy validity. Runtime rules live in
+[the public runtime conventions](https://github.com/hanzhichao2000/joseph-docs-public/blob/main/contracts/runtime-conventions.md).
+
 ## Contract expiry
 
 `attach_contracts` takes contract attributes from `option_contracts` and rejects missing or
