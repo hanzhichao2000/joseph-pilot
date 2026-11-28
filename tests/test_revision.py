@@ -7,10 +7,9 @@ from datetime import date
 from pathlib import Path
 
 import pandas as pd
-import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-from joseph_api import RevisionFile, RevisionRecord, RevisionWindow
+from joseph_api import RevisionFile, RevisionRecord
 from joseph_dal import RevisionVerificationError
 
 from joseph_pilot.manifest import Pin
@@ -18,42 +17,6 @@ from joseph_pilot.revision import RevisionData, attach_contracts, load_revision,
 from joseph_pilot.runtime import Settings, bootstrap
 
 WINDOW = (date(2024, 1, 2), date(2024, 1, 5))
-
-
-def make_revision(
-    root: Path,
-    capability: str,
-    frames: dict[str, list[dict[str, object]]],
-    *,
-    window: tuple[date, date] | None = WINDOW,
-    lake_id: str = "fake0001",
-) -> RevisionRecord:
-    """Write a revision the way the provider does: parquet under `<capability>/...`, digests, receipt."""
-    files = []
-    for rel, rows in frames.items():
-        path = root / capability / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        pq.write_table(pa.Table.from_pylist(rows), path)
-        files.append(
-            RevisionFile(
-                path=path.relative_to(root).as_posix(),
-                digest=hashlib.sha256(path.read_bytes()).hexdigest(),
-                size=path.stat().st_size,
-            )
-        )
-    record = RevisionRecord(
-        capability_id=capability,
-        schema_version="cne-contract-0.25.0",
-        source="cnequity@0.25.0",
-        revision_id=f"{capability}@lake:{lake_id}",
-        content_digest=RevisionRecord.compute_content_digest(
-            capability, "cne-contract-0.25.0", "cnequity@0.25.0", tuple(files)
-        ),
-        files=tuple(files),
-        window=RevisionWindow(start=window[0], end=window[1]) if window else None,
-    )
-    (root / f"{capability}.revision.json").write_text(record.to_json(), encoding="utf-8")
-    return record
 
 
 BARS = {
@@ -80,7 +43,7 @@ def settings_for(root: Path) -> Settings:
     return Settings(mode="research", revision_root=root)
 
 
-def test_load_revision_returns_rows_and_pin(tmp_path: Path) -> None:
+def test_load_revision_returns_rows_and_pin(make_revision, tmp_path: Path) -> None:
     record = make_revision(tmp_path, "option_bars", BARS)
     data = load_revision("option_bars", settings=settings_for(tmp_path))
     assert isinstance(data, RevisionData)
@@ -119,7 +82,7 @@ def add_coverage_file(root: Path, record: RevisionRecord) -> RevisionRecord:
     return updated
 
 
-def test_load_revision_skips_coverage_json(tmp_path: Path) -> None:
+def test_load_revision_skips_coverage_json(make_revision, tmp_path: Path) -> None:
     record = add_coverage_file(tmp_path, make_revision(tmp_path, "option_bars", BARS))
     data = load_revision("option_bars", settings=settings_for(tmp_path))
     assert data.record == record
@@ -127,14 +90,14 @@ def test_load_revision_skips_coverage_json(tmp_path: Path) -> None:
     assert "calendar_unverified" not in data.rows.columns
 
 
-def test_load_revision_rejects_receipt_without_parquet(tmp_path: Path) -> None:
+def test_load_revision_rejects_receipt_without_parquet(make_revision, tmp_path: Path) -> None:
     add_coverage_file(tmp_path, make_revision(tmp_path, "option_bars", {}))
     with pytest.raises(ValueError, match="contains no Parquet data files"):
         load_revision("option_bars", settings=settings_for(tmp_path))
 
 
 def test_missing_file_fails_by_name_before_any_read(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_revision, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     make_revision(tmp_path, "option_bars", BARS)
     (tmp_path / "option_bars/year=2024/month=1/data_0.parquet").unlink()
@@ -147,7 +110,9 @@ def test_missing_file_fails_by_name_before_any_read(
         load_revision("option_bars", settings=settings_for(tmp_path))
 
 
-def test_load_revision_makes_no_live_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_revision_makes_no_live_call(
+    make_revision, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     make_revision(tmp_path, "option_bars", BARS)
 
     def _no_subprocess(*args: object, **kwargs: object) -> None:
@@ -162,7 +127,7 @@ def test_load_revision_makes_no_live_call(tmp_path: Path, monkeypatch: pytest.Mo
     assert len(data.rows) == 2
 
 
-def test_load_revision_requires_the_root_variable(tmp_path: Path) -> None:
+def test_load_revision_requires_the_root_variable(make_revision, tmp_path: Path) -> None:
     make_revision(tmp_path, "option_bars", BARS)
     with pytest.raises(RuntimeError, match="JOSEPH_PILOT_REVISION_ROOT"):
         load_revision("option_bars", settings=Settings(mode="research"))
